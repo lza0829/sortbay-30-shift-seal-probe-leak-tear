@@ -1,11 +1,12 @@
 import React from 'react'
-import { useGate, gateLabel } from '../gate'
+import { useGate, gateLabel, isTorn, isWriteLocked } from '../gate'
 
 const GATES = [
   ['装载闸', '皮带装载'],
   ['裁决闸', '路由裁决'],
   ['回流闸', '错分回流'],
-  ['封袋闸', '开袋/入袋/封口'],
+  ['集包闸', '开新袋'],
+  ['封袋闸', '入袋/封口'],
 ]
 
 // 全局同刷的封班闸态灯：班次页、扫描册、口门页、封袋页、回流页、总览共用
@@ -14,13 +15,17 @@ export default function GateBanner() {
   if (!gate || gate.有班次 === false) {
     return <div className="gate-banner gate-none">当前无班次</div>
   }
-  const locked = gate.全关
+  const locked = isWriteLocked(gate)
+  const torn = isTorn(gate)
   return (
     <div className={`gate-banner ${locked ? 'gate-locked' : 'gate-open'}`}>
       <div className="gate-head">
         <span className={`gate-dot ${locked ? 'dot-red' : 'dot-green'}`} />
         <strong>{gate.营业日} {gate.班次名}</strong>
-        <span className="gate-state">{locked ? '已封班 · 写口全关（只读）' : '未封班 · 写口全开'}</span>
+        <span className="gate-state">
+          {torn ? '封班宣称与五路拒证撕裂（以拒证为准，写口以灯为准）'
+            : locked ? '已封班 · 五路全关（只读）' : '未封班 · 写口全开'}
+        </span>
         <span className="gate-gen">世代 {gate.世代号}</span>
       </div>
       <div className="gate-lamps">

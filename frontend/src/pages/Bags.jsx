@@ -3,7 +3,6 @@ import { api } from '../api'
 import GateBanner from '../components/GateBanner'
 import { useGate, isWriteLocked } from '../gate'
 
-const surface_panel = true
 export default function Bags() {
   const [bags, setBags] = useState([])
   const [chutes, setChutes] = useState([])
@@ -41,10 +40,10 @@ export default function Bags() {
     } catch (e) { setErr(e.message) }
   }
   return (
-    <div className={surface_panel ? "panel" : "panel"}>
+    <div className="panel">
       <h2>封袋</h2>
       <GateBanner />
-      {locked && <div className="lock-note">已封班：封袋闸关闭，禁止开新袋、入袋与封口，仅可查询既有袋。</div>}
+      {locked && <div className="lock-note">已封班：集包闸与封袋闸关闭，禁止开新袋、入袋与封口，仅可查询既有袋。</div>}
       {msg && <div className="msg">{msg}</div>}
       {err && <div className="err">{err}</div>}
       <div className="row">
@@ -53,7 +52,7 @@ export default function Bags() {
             {chutes.map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}
           </select>
         </label>
-        <button type="button" onClick={openBag} disabled={locked}>{locked ? '封袋闸已关' : '开袋'}</button>
+        <button type="button" onClick={openBag} disabled={locked}>{locked ? '集包闸已关' : '开袋'}</button>
       </div>
       <div className="row">
         <label>袋编号<input value={bagId} onChange={(e) => setBagId(e.target.value)} disabled={locked} /></label>
@@ -63,8 +62,8 @@ export default function Bags() {
             {scans.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.barcode}</option>)}
           </select>
         </label>
-        <button type="button" onClick={add} disabled={locked || !scanId}>入袋</button>
-        <button type="button" className="secondary" onClick={seal} disabled={locked || !bagId}>封口</button>
+        <button type="button" onClick={add} disabled={locked || !scanId}>{locked ? '封袋闸已关' : '入袋'}</button>
+        <button type="button" className="secondary" onClick={seal} disabled={locked || !bagId}>{locked ? '封袋闸已关' : '封口'}</button>
       </div>
       <table>
         <thead><tr><th>编号</th><th>袋码</th><th>口门</th><th>状态</th><th>件数</th></tr></thead>

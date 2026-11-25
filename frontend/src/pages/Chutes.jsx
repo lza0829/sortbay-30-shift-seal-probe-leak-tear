@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { api } from '../api'
 import GateBanner from '../components/GateBanner'
 
-const surface_panel = true
 export default function Chutes() {
   const [rows, setRows] = useState([])
   const [err, setErr] = useState('')
@@ -13,7 +12,7 @@ export default function Chutes() {
     catch (e) { setErr(e.message) }
   }
   return (
-    <div className={surface_panel ? "panel" : "panel"}>
+    <div className="panel">
       <h2>口门</h2>
       <GateBanner />
       {err && <div className="err">{err}</div>}

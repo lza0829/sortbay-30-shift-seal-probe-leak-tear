@@ -5,11 +5,12 @@ from __future__ import annotations
 import threading
 
 from app.db import db_write
+from app.db import GATE_COLLECT
 from app.services.gates import GATE_BAG, GATE_DIVERT, GATE_LOAD, GATE_ROUTE, replay_gates
 
 from conftest import drive_one_to_sealed_bag, clear_seed_scan, seal_current
 
-GATES = (GATE_LOAD, GATE_ROUTE, GATE_DIVERT, GATE_BAG)
+GATES = (GATE_LOAD, GATE_ROUTE, GATE_DIVERT, GATE_COLLECT, GATE_BAG)
 
 
 # ---------- 未封班：写口全开，不存在误挡 ----------
@@ -73,10 +74,10 @@ def test_sealed_rejects_divert(sealed_shift):
 
 
 def test_sealed_rejects_bag_open_add_seal(sealed_shift):
-    """封后仍开新袋/入袋/封口夹具：封袋闸关闭。"""
+    """封后仍开新袋/入袋/封口夹具：集包闸与封袋闸各自关闭。"""
     client, shift, _ = sealed_shift
     r_open = client.post("/api/封袋/开袋", json={"口门编号": 1})
-    assert r_open.status_code == 409 and "封袋闸" in r_open.json()["detail"]
+    assert r_open.status_code == 409 and "集包闸" in r_open.json()["detail"]
     bag = client.get("/api/封袋").json()[0]
     scan = client.get("/api/扫描").json()[0]
     r_add = client.post(f"/api/封袋/{bag['id']}/入袋", json={"扫描编号": scan["id"]})
@@ -103,8 +104,8 @@ def test_gate_replay_matches_snapshot(sealed_shift):
     assert view["封班快照"] is True
     assert view["重放与快照一致"] is True
     assert view["重放闸态"] == {g: "关" for g in GATES}
-    # 四条闸事件，逐闸一条
-    assert len(view["事件流"]) == 4
+    # 五条闸事件，逐闸一条
+    assert len(view["事件流"]) == 5
     assert {e["gate"] for e in view["事件流"]} == set(GATES)
     assert all(e["state"] == "关" for e in view["事件流"])
     # 服务层重放与 HTTP 视图一致
@@ -203,7 +204,7 @@ def test_all_surfaces_reflect_sealed_state(sealed_shift):
     assert listed["全关"] is True and listed["闸态"] == {g: "关" for g in GATES}
     # 审计含封班联动记录
     audit = client.get("/api/审计").json()
-    assert any(e["action"] == "封班" and "四闸" in e["note"] for e in audit)
+    assert any(e["action"] == "封班" and "五闸" in e["note"] for e in audit)
 
 
 def test_destination_write_then_no_post_seal_load(client):

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.db import db, db_write, rows_to_list, row_to_dict
 from app.services.common import audit, now_str
-from app.services.gates import GATE_BAG, assert_gate_open, latest_shift
+from app.services.gates import GATE_BAG, GATE_COLLECT, assert_gate_open, latest_shift
 
 router = APIRouter(tags=["封袋"])
 
@@ -34,10 +34,10 @@ def list_bags():
 
 @router.post("/封袋/开袋")
 def open_bag(body: BagOpenIn):
-    # 封袋闸-开袋：封班后禁止开新袋
+    # 集包闸：封班后禁止开新袋（集包入口是封班五路之一，独立于封袋闸）
     with db_write() as conn:
         shift = latest_shift(conn)
-        assert_gate_open(conn, shift["id"], GATE_BAG)
+        assert_gate_open(conn, shift["id"], GATE_COLLECT)
         chute = conn.execute("SELECT * FROM chutes WHERE id=?", (body.口门编号,)).fetchone()
         if not chute:
             raise HTTPException(404, "口门不存在")
@@ -66,6 +66,8 @@ def add_to_bag(bag_id: int, body: BagAddIn):
             raise HTTPException(404, "扫描不存在")
         if scan["status"] != "已路由":
             raise HTTPException(400, "仅已路由件可入袋")
+        if scan["shift_id"] != bag["shift_id"]:
+            raise HTTPException(400, "扫描件与袋不是同一班次")
         if scan["chute_id"] != bag["chute_id"]:
             raise HTTPException(400, "扫描口门与袋口门不一致")
         conn.execute(
@@ -101,7 +103,3 @@ def seal_bag(bag_id: int):
         )
         audit(conn, "封袋", bag_id, "封口", f"件数{n}")
         return row_to_dict(conn.execute("SELECT * FROM bags WHERE id=?", (bag_id,)).fetchone())
-
-def _surface_router_bags() -> dict:
-    return {"panel": "bags", "ready": True}
-

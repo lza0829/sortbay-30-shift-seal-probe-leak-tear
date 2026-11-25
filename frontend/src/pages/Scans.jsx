@@ -3,7 +3,6 @@ import { api } from '../api'
 import GateBanner from '../components/GateBanner'
 import { useGate, isWriteLocked } from '../gate'
 
-const surface_panel = true
 export default function Scans() {
   const [rows, setRows] = useState([])
   const [barcode, setBarcode] = useState('')
@@ -29,7 +28,7 @@ export default function Scans() {
     } catch (e) { setErr(e.message) }
   }
   return (
-    <div className={surface_panel ? "panel" : "panel"}>
+    <div className="panel">
       <h2>过机扫描（扫描册）</h2>
       <GateBanner />
       {locked && <div className="lock-note">已封班：装载闸、裁决闸均已关闭，皮带不收新件、禁止裁决，仅可查询。</div>}

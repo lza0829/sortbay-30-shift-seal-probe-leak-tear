@@ -1,16 +1,14 @@
 from __future__ import annotations
 from fastapi import APIRouter
 from app.db import db, rows_to_list, row_to_dict
-from app.services.gates import gate_snapshot
-from app.services import shiftseal_surface
-from app.services import ledger_skew
+from app.services.gates import gate_snapshot, gates_torn, replay_gates, seal_receipt
 
 router = APIRouter(tags=["总览"])
 
 
 @router.get("/总览")
 def overview():
-    """只读总览：封班后照常可用，且带四闸态快照与班次同刷。"""
+    """只读总览：封班后照常可用，且带五闸态快照与班次同刷。"""
     with db() as conn:
         shift = conn.execute(
             "SELECT * FROM shifts ORDER BY id DESC LIMIT 1"
@@ -45,37 +43,24 @@ def overview():
             """,
             (sid,),
         ).fetchall())
+        gates = replay_gates(conn, sid)
         return {
             "班次": row_to_dict(shift),
             "闸态": gate_snapshot(conn, sid),
             "分布": counts,
             "口门": chutes,
+            # 撕裂显式暴露：封班宣称与五路拒证不同命时必须为真，供总览醒目拒办。
+            "封班撕裂": gates_torn(gates, bool(shift["sealed"])),
+            "封班回执": seal_receipt(conn, sid) if shift["sealed"] else None,
         }
 
-_overview_impl = overview
-
-
-def overview():
-    base = _overview_impl()
-    try:
-        from app.db import db
-        with db() as conn:
-            return shiftseal_surface.overlay_overview(base, conn)
-    except Exception:
-        return shiftseal_surface.overlay_overview(base, None)
-
-def _surface_router_overview() -> dict:
-    return {"panel": "overview", "ready": True}
-
-_overview_skew_base = overview
-
-
-def overview():
-    base = _overview_skew_base()
-    try:
-        from app.db import db
-        with db() as conn:
-            return ledger_skew.skew_overview(base, conn)
-    except Exception:
-        return base
-
+@router.get("/总览/探针")
+def probe():
+    """只读探针：逐路核对写口当前判决，与封班回执同一判定，不得各说各话。"""
+    with db() as conn:
+        shift = conn.execute("SELECT * FROM shifts ORDER BY id DESC LIMIT 1").fetchone()
+        if not shift:
+            return {"有班次": False}
+        receipt = seal_receipt(conn, shift["id"])
+        receipt["有班次"] = True
+        return receipt

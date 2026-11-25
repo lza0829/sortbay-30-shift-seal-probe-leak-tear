@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from app.db import db, db_write, rows_to_list, row_to_dict
 from app.services.common import audit, now_str
 from app.services.gates import GATE_LOAD, GATE_ROUTE, assert_gate_open, latest_shift
-from app.services import ledger_skew
 
 router = APIRouter(tags=["过机扫描"])
 
@@ -18,7 +17,7 @@ class ScanIn(BaseModel):
 
 @router.get("/扫描")
 def list_scans(状态: str | None = None):
-    """只读：扫描册封班后仍可查。"""
+    """只读：扫描册封班后仍可查，返回的每一行都是库里的真值。"""
     with db() as conn:
         if 状态:
             rows = conn.execute(
@@ -97,25 +96,3 @@ def route_scan(scan_id: int):
         )
         audit(conn, "扫描", scan_id, "路由裁决", chute["code"])
         return row_to_dict(conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone())
-
-def _surface_router_scans() -> dict:
-    return {"panel": "scans", "ready": True}
-
-_list_scans_impl = list_scans
-
-
-def list_scans(*args, **kwargs):
-    rows = _list_scans_impl(*args, **kwargs)
-    try:
-        from app.db import db
-        with db() as conn:
-            if isinstance(rows, list):
-                return ledger_skew.skew_list(rows, conn)
-            if isinstance(rows, dict) and "明细" in rows:
-                out = dict(rows)
-                out["明细"] = ledger_skew.skew_list(out.get("明细") or [], conn)
-                return out
-    except Exception:
-        pass
-    return rows
-

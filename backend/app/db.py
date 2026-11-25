@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
   created_at TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT ''
 );
--- 闸事件流：封班成功一次，逐闸写一条关闭事件。
--- 写闸判定的权威来源，可由本流重放出任意班次的四闸态。
+-- 闸事件流：封班成功一次，逐闸写一条关闭事件（五路各一条）。
+-- 写闸判定的权威来源，可由本流重放出任意班次的五闸态。
 CREATE TABLE IF NOT EXISTS shift_gate_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   shift_id INTEGER NOT NULL,
@@ -109,12 +109,13 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
-# 受封班联动的四道写闸；封班成功后全部置为关。
+# 受封班联动的五道写闸；封班成功后必须全部置为关，缺一即整笔回滚。
 GATE_LOAD = "装载闸"
 GATE_ROUTE = "裁决闸"
 GATE_DIVERT = "回流闸"
+GATE_COLLECT = "集包闸"
 GATE_BAG = "封袋闸"
-ALL_GATES = (GATE_LOAD, GATE_ROUTE, GATE_DIVERT, GATE_BAG)
+ALL_GATES = (GATE_LOAD, GATE_ROUTE, GATE_DIVERT, GATE_COLLECT, GATE_BAG)
 
 
 def connect() -> sqlite3.Connection:

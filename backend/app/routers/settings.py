@@ -20,14 +20,11 @@ def list_settings():
 
 @router.post("/设置")
 def set_setting(body: SettingIn):
-    with db() as conn:
+    with db_write() as conn:
         conn.execute(
             "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (body.键, body.值),
         )
         audit(conn, "设置", None, "改设置", f"{body.键}={body.值}")
         return {"键": body.键, "值": body.值}
-
-def _surface_router_settings() -> dict:
-    return {"panel": "settings", "ready": True}
 

@@ -29,9 +29,20 @@ export function useGate() {
   return { gate, refresh }
 }
 
-// 封班后任意写口是否禁用
+// 封班后任意写口是否禁用。后端给出唯一判决「写口禁用」（快照已封 或 重放全关），
+// 前端照抄，避免只盯一半而出现「徽标亮仍可写/徽标灭写口已关」。
 export function isWriteLocked(gate) {
-  return !!gate && gate.有班次 !== false && !!gate.全关
+  if (!gate || gate.有班次 === false) return false
+  if (gate.写口禁用 !== undefined) return !!gate.写口禁用
+  return !!gate.全关
+}
+
+// 封班宣称与五路拒证不同命：页面必须醒目拒办，而不是照常显示"已封可办"。
+export function isTorn(gate) {
+  if (!gate || gate.有班次 === false) return false
+  if (gate.封班撕裂 !== undefined) return !!gate.封班撕裂
+  const allClosed = gate.闸态 && Object.values(gate.闸态).every((v) => v === '关')
+  return !!gate.已封班 !== !!allClosed
 }
 
 // 某道闸的中文状态

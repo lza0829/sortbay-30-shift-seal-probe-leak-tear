@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from app.db import db, rows_to_list, row_to_dict
+from app.db import db, db_write, rows_to_list, row_to_dict
 from app.services.common import audit
 
 router = APIRouter(tags=["路由表"])
@@ -27,7 +27,7 @@ def list_routes():
 
 @router.post("/路由表")
 def upsert_route(body: RouteIn):
-    with db() as conn:
+    with db_write() as conn:
         chute = conn.execute("SELECT * FROM chutes WHERE id=?", (body.口门编号,)).fetchone()
         if not chute:
             raise HTTPException(404, "口门不存在")
@@ -52,7 +52,4 @@ def upsert_route(body: RouteIn):
             action = "新建路由"
         audit(conn, "路由表", rid, action, body.目的地码)
         return row_to_dict(conn.execute("SELECT * FROM route_rules WHERE id=?", (rid,)).fetchone())
-
-def _surface_router_routes() -> dict:
-    return {"panel": "routes", "ready": True}
 

@@ -160,6 +160,7 @@ th { background: #e4e8ee; }
 }
 .lamp-off { color: var(--danger); }
 .lamp-on { color: var(--ok); }
+.lamp-warn { color: #8a5a00; border-color: #d9a441; background: #fdf3dd; font-weight: 700; }
 .gate-dot, .lamp-dot {
   width: 0.7rem; height: 0.7rem; border-radius: 50%;
   display: inline-block;

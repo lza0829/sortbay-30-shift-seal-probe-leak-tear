@@ -3,8 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from app.db import db, db_write, rows_to_list, row_to_dict
 from app.services.common import audit
-from app.services.gates import gate_snapshot, replay_gates, seal_shift
-from app.services import shiftseal_surface
+from app.services.gates import gate_snapshot, gates_torn, replay_gates, seal_receipt, seal_shift
 
 router = APIRouter(tags=["班次"])
 
@@ -16,12 +15,17 @@ class ShiftIn(BaseModel):
 
 @router.get("/班次")
 def list_shifts():
-    """只读：封班后仍可用。每条班次带重放得到的四闸态。"""
+    """只读：封班后仍可用。每条班次带重放得到的五闸态与五路拒证。"""
     with db() as conn:
         rows = rows_to_list(conn.execute("SELECT * FROM shifts ORDER BY id DESC").fetchall())
         for r in rows:
-            r["闸态"] = replay_gates(conn, r["id"])
-            r["全关"] = bool(r["sealed"])
+            gates = replay_gates(conn, r["id"])
+            r["闸态"] = gates
+            # 全关只能由事件流重放推得，不能单看 sealed 标志。
+            r["全关"] = all(v == "关" for v in gates.values())
+            r["封班撕裂"] = gates_torn(gates, bool(r["sealed"]))
+            # 回执只在已封班时才有意义；未封班不给回执，避免把"全开"当"收口"。
+            r["封班回执"] = seal_receipt(conn, r["id"]) if r["sealed"] else None
         return rows
 
 
@@ -66,10 +70,13 @@ def reconcile(shift_id: int | None = None):
             "SELECT COUNT(*) c FROM scans WHERE shift_id=? AND status IN ('待路由','错分回流')",
             (sid,),
         ).fetchone()["c"]
+        gates = replay_gates(conn, sid)
         return {
             "班次": row_to_dict(shift),
-            "闸态": replay_gates(conn, sid),
-            "全关": bool(shift["sealed"]),
+            "闸态": gates,
+            "全关": all(v == "关" for v in gates.values()),
+            "封班撕裂": gates_torn(gates, bool(shift["sealed"])),
+            "封班回执": seal_receipt(conn, sid) if shift["sealed"] else None,
             "扫描总数": scan_n,
             "已路由及以上": routed,
             "袋数": bag_n,
@@ -103,17 +110,6 @@ def create_shift(body: ShiftIn):
 
 @router.post("/班次/{shift_id}/封班")
 def seal(shift_id: int):
-    # 封班入口本身即写事务；内部复查 + 四闸事件 + 审计同刷，失败整体回滚
+    # 封班入口本身即写事务：内部复查 + 五闸事件 + 自证 + 审计同刷，失败整体回滚
     with db_write() as conn:
         return seal_shift(conn, shift_id)
-
-_seal_impl = seal
-
-
-def seal(*args, **kwargs):
-    out = _seal_impl(*args, **kwargs)
-    return shiftseal_surface.after_seal(out, *args, **kwargs)
-
-def _surface_router_shifts() -> dict:
-    return {"panel": "shifts", "ready": True}
-
